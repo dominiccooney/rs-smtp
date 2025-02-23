@@ -20,7 +20,7 @@ use regex::Regex;
 
 use tokio::io::{self, BufReader, AsyncWriteExt, AsyncReadExt, AsyncBufReadExt};
 use tokio::net::TcpStream;
-
+use tokio_rustls::server::TlsStream;
 //const ERR_THRESHOLD: usize = 3;
 
 pub struct Conn<B: Backend> {
@@ -47,8 +47,16 @@ pub struct Conn<B: Backend> {
 
 impl<B: Backend> Conn<B> {
     pub fn new(stream: TcpStream, _max_line_length: usize) -> Self {
-        return Conn {
-            stream: BufReader::new(MyStream::new(stream)),
+        return Self::new_stream(BufReader::new(MyStream::new(stream)))
+    }
+
+    pub fn new_tls(stream: TlsStream<TcpStream>, _max_line_length: usize) -> Self {
+        return Self::new_stream(BufReader::new(MyStream { unsafe_stream: None, safe_stream: Some(stream), limit: 0 }))
+    }
+
+    fn new_stream(stream: BufReader<MyStream>) -> Self {
+    return Conn {
+            stream,
             //text: textproto::Conn::new(stream.clone()),
             helo: String::new(),
             err_count: 0,

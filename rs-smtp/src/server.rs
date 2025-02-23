@@ -9,9 +9,6 @@ use anyhow::Result;
 use tokio::net::TcpListener;
 use tokio_rustls::TlsAcceptor;
 
-
-// const ERR_TCP_AND_LMTP: &str = "smtp: cannot start LMTP server listening on a TCP socket";
-
 pub struct Server<B: Backend> {
     pub addr: String,
     pub tls_acceptor: Option<TlsAcceptor>,
@@ -61,15 +58,25 @@ impl<B: Backend> Server<B> {
         }
     }
 
-    pub async fn serve(self: Arc<Self>, l: TcpListener) -> Result<()> {
+    pub async fn serve_tls(self: Arc<Self>, l: TcpListener) -> Result<()> {
+        println!("Listening on {}", self.addr);
         loop {
             match l.accept().await {
                 Ok((stream, _)) => {
+                    println!("New connection from {}", stream.peer_addr()?);
                     let server = self.clone();
+                    let acceptor = self.tls_acceptor.clone().unwrap();
                     println!("New connection");
                     tokio::spawn(async move {
-                        if let Err(err) = server.handle_conn(Conn::new(stream, server.max_line_length)).await {
-                            println!("Error333: {}", err);
+                        match acceptor.accept(stream).await {
+                            Ok(tls_stream) => {
+                                if let Err(err) = server.handle_conn(Conn::new_tls(tls_stream, server.max_line_length)).await {
+                                    println!("Error333: {}", err);
+                                }
+                            }
+                            Err(err) => {
+                                println!("Error222: {}", err);
+                            }
                         }
                     });
                 }
@@ -112,17 +119,10 @@ impl<B: Backend> Server<B> {
         }
     }
 
-    pub async fn listen_and_serve(self) -> Result<()> {
-        let l = TcpListener::bind(&self.addr).await?;
-        Arc::new(self).serve(l).await
+    // TODO: This server now *only* supports explicit TLS, so we should drop STARTTLS support.
+    pub async fn listen_and_serve_tls(self) -> Result<()> {
+        let tcp_listener = TcpListener::bind(&self.addr).await?;
+        let s = Arc::new(self);
+        s.serve_tls(tcp_listener).await
     }
-
-    /*
-    pub async fn listen_and_serve_tls(&mut self) -> Result<()> {
-        let tls = self.server.tls_acceptor.as_ref().unwrap();
-        let l = TcpListener::bind(&self.server.addr).await?;
-        let l = tls.accept(l)?;
-        self.serve(l).await
-    }
-    */
 }
