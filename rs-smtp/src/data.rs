@@ -1,6 +1,6 @@
-use std::{pin::Pin, future::Future, task::Poll, io::{ErrorKind, Error}};
+use std::{pin::Pin, task::Poll, io::{ErrorKind, Error}};
 
-use tokio::io::{self, AsyncRead, AsyncBufReadExt, AsyncBufRead, BufReader};
+use tokio::io::{AsyncRead, AsyncBufReadExt, AsyncBufRead, BufReader};
 
 pub type EnhancedCode = [i8; 3];
 
